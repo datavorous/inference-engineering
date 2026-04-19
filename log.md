@@ -13,3 +13,4 @@
 - analysed the exisiting infrastructure's status and generated diagrams and a beginner manual - using claude code
 - generated the list of "problems" that we need to tackle initially
 - generated a manual for setting up the test-bed, on which further experiments will take place [0env.md](logs/0env.md)
+- summarised everything upto this [understanding WHAT we have + minimal setup] in [stage0.md](summary/stage0.md)

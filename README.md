@@ -19,6 +19,7 @@ I have access to Claude Code and Opus 4.7: what better reason can there be to pu
     - allowed web access to search for NVIDIA's docs, vLLM docs etc. **[NEEDS MANUAL VERIFICATION]**
 5. generated the list of ["problems"](knowledge/init_problems.md) that we need to tackle initially
 6. generated a small getting started file to setup the test-bed. [1](logs/0env.md)
+7. summarised everything upto this [understanding WHAT we have + minimal setup] in [stage0.md](summary/stage0.md)
 
 yet to * actually * try everything out. will keep on enriching the theoretical part till then.
 

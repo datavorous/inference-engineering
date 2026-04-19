@@ -11,7 +11,6 @@ my_reads:
 
 the single question this doc answers: how do i get a working GPU environment on the cluster so i can run, train, and serve models?
 
----
 
 ## questions to ask before touching anything
 
@@ -36,7 +35,6 @@ for fellow interns:
 4. where are your cached models sitting - can i point to the same cache?
 5. is there a repo i should clone before i write any code?
 
----
 
 ## storage constraints (read before installing anything)
 
@@ -50,7 +48,6 @@ for fellow interns:
 
 everything goes in share1. home fills up fast. tmp disappears.
 
----
 
 ## step 1: assess the node
 
@@ -67,7 +64,6 @@ ls /share1/                   # check if teammates have a shared cache already
 
 the 1080 nodes only support older CUDA. if you install a torch built for CUDA 12.x on a 1080, it silently falls back to CPU. match nvcc output to the torch install below.
 
----
 
 ## step 2: set cache dirs
 
@@ -79,7 +75,6 @@ echo 'export CONDA_PKGS_DIRS=/share1/$USER/.cache/conda' >> ~/.bashrc
 source ~/.bashrc
 ```
 
----
 
 ## step 3: create env in share1
 
@@ -103,7 +98,6 @@ df -h /share1
 
 env + cache should be under 40GB total or you won't have room for models.
 
----
 
 ## step 4: verify GPU
 
@@ -114,7 +108,6 @@ print(torch.cuda.get_device_name(0))
 print(torch.cuda.get_device_properties(0).total_memory / 1e9, "GB")
 ```
 
----
 
 ## step 5: dummy inference (proof of life)
 
@@ -134,7 +127,6 @@ print(pipe("Hello, I am", max_new_tokens=20))
 
 model must download to share1, not home.
 
----
 
 ## step 6: verify all 4 GPUs
 
@@ -149,7 +141,6 @@ for i in range(torch.cuda.device_count()):
 
 cross-node training is currently bottlenecked - InfiniBand is underperforming. single-node 4-GPU is the ceiling until that's fixed.
 
----
 
 ## step 7: multi-GPU smoke test
 
@@ -169,7 +160,6 @@ print(f"rank {rank} / {dist.get_world_size()} - GPU {torch.cuda.current_device()
 dist.destroy_process_group()
 ```
 
----
 
 ## first week checklist
 
@@ -181,7 +171,6 @@ dist.destroy_process_group()
 - [ ] all 4 GPUs verified, torchrun multi-GPU test passes
 - [ ] everything that broke is written down
 
----
 
 ## next: containerization
 

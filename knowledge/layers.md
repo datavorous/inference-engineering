@@ -58,7 +58,6 @@ Study computer architecture and digital design (RTL, Verilog, VHDL). Learn GPU m
 ### Why Pursue, Who Should, What to Expect
 Pursue this path if you love physics, EE, and hardware design. Best fit for electrical engineers, computer architects, and researchers. Expect 5 to 10 year timelines for chip design, high barriers to entry, and enormous leverage where one architectural innovation can benefit millions of users.
 
----
 
 ## Layer 02: Kernels and Low-Level Compute
 
@@ -113,7 +112,6 @@ Master CUDA fundamentals, then study FlashAttention source. Learn Triton for fas
 ### Why Pursue, Who Should, What to Expect
 Pursue this layer if you enjoy low-level optimization and memory hierarchy reasoning. Steep learning curve, but exceptional impact and demand.
 
----
 
 ## Layer 03: Frameworks and Model Runtime
 
@@ -166,7 +164,6 @@ Contribute to PyTorch internals, torch.compile backends, operator systems, and m
 ### Why Pursue, Who Should, What to Expect
 Strong fit for engineers interested in compilers and systems interfaces between high-level code and low-level execution.
 
----
 
 ## Layer 04: Inference Engines
 
@@ -219,7 +216,6 @@ Start with benchmarking and profiling. Contribute scheduling improvements, model
 ### Why Pursue, Who Should, What to Expect
 Strong path for engineers wanting high-impact inference optimization work with direct production outcomes.
 
----
 
 ## Layer 05: Distributed Orchestration
 
@@ -272,7 +268,6 @@ Develop deep Kubernetes and distributed systems skills. Contribute to orchestrat
 ### Why Pursue, Who Should, What to Expect
 Best for engineers combining platform, infrastructure, and ML systems experience at cluster scale.
 
----
 
 ## Layer 06: Serving Infrastructure and Production
 
@@ -325,7 +320,6 @@ Build expertise in Kubernetes, observability, platform reliability, and GPU cost
 ### Why Pursue, Who Should, What to Expect
 Strong fit for software, platform, and reliability engineers entering AI systems through operational excellence.
 
----
 
 ## Layer 07: Model Optimization Techniques
 

@@ -1,13 +1,10 @@
 # The Beginner's Complete Guide to LLM Inference Engineering
 ### For the intern who just walked in and knows nothing yet
 
----
 
 ## How to Use This Document
 
 Read it top to bottom. Every section builds on the last. By the end you will understand what the team is doing, why the infrastructure is set up the way it is, what the problems are, and how the work you will do fits into the bigger picture.
-
----
 
 ## Part 1: What Is This Team Working On?
 
@@ -20,7 +17,6 @@ An LLM is a neural network (think: a very large mathematical function) that gene
 
 Both operations are extremely computationally expensive. That is why you need GPUs.
 
----
 
 ## Part 2: Understanding GPUs (Without an EE Degree)
 
@@ -34,7 +30,6 @@ graph LR
 
 The team's clusters have NVIDIA GPUs. Each GPU has its own **VRAM** (Video RAM) - fast memory that sits right on the card. The model weights must fit in VRAM to run efficiently.
 
----
 
 ## Part 3: The Two Clusters - Ada and Turing
 
@@ -75,7 +70,6 @@ With 4 GPUs at 11GB each = 44GB total. This means:
 
 The Turing cluster's 48GB cards are about 4× more capable per card.
 
----
 
 ## Part 4: The Two Phases of LLM Inference (Prefill vs Decode)
 
@@ -96,7 +90,6 @@ sequenceDiagram
 
 **Why this matters:** These two phases have different bottlenecks, so optimizing them requires different techniques. Prefill is limited by raw compute speed (TFLOPS). Decode is limited by how fast you can read data from memory (memory bandwidth, measured in TB/s).
 
----
 
 ## Part 5: The 7 Layers of the Inference Stack
 
@@ -139,7 +132,6 @@ No software trick can exceed these physical limits.
 
 **Impact on you:** When a model run crashes with "CUDA out of memory", this layer is why. The fix is either a smaller model, lower precision, or spreading across more GPUs.
 
----
 
 ### Layer 2: Kernels and Low-Level Compute
 
@@ -176,7 +168,6 @@ graph LR
 
 FlashAttention does the same math but 2-8× faster because it avoids expensive memory round-trips. This is a kernel-level optimization - same hardware, smarter program.
 
----
 
 ### Layer 3: Frameworks and Model Runtime
 
@@ -197,7 +188,6 @@ flowchart LR
 - **CUDA Graph:** Record a sequence of GPU operations once, then replay it very fast
 - **Operator Fusion:** Combine two small operations into one large one to avoid overhead
 
----
 
 ### Layer 4: Inference Engines
 
@@ -263,7 +253,6 @@ graph TB
 - **ITL / TPOT:** Inter-Token Latency - how long between each subsequent word
 - **Throughput:** How many tokens per second the system produces total
 
----
 
 ### Layer 5: Distributed Orchestration
 
@@ -319,7 +308,6 @@ flowchart LR
 
 This is why the meeting notes say "distribute to multiple GPUs across gnodes: not feasible due to network bottleneck."
 
----
 
 ### Layer 6: Serving Infrastructure and Production
 
@@ -346,7 +334,6 @@ graph TB
 - **Blue-Green Deployment:** Run old and new versions simultaneously; switch traffic over only when new version is healthy - zero downtime updates
 - **Streaming:** Sending tokens to the user one-by-one as they are generated (what gives ChatGPT that typewriter effect)
 
----
 
 ### Layer 7: Model Optimization Techniques
 
@@ -372,7 +359,6 @@ A 7B model at FP32 = ~28GB. The same model at INT4 = ~3.5GB. That is 8× smaller
 | GQA (Grouped Query Attention) | Multiple attention heads share key/value projections | Smaller KV cache, faster decode |
 | LoRA / PEFT | Fine-tune only a tiny fraction of parameters | Cheap customization without full retraining |
 
----
 
 ## Part 6: The Problems with Our Cluster Right Now
 
@@ -425,44 +411,58 @@ graph TB
 | Flash-attention optimization | Not supported | Supported |
 | FP8 / mxfp4 | Not supported | Not supported (needs H/B series) |
 
----
 
 ## Part 7: The Work Plan - What You Will Actually Do
 
-This is the sequence of tasks from the April 14 meeting, mapped to the inference stack layers above:
-
 ```mermaid
 flowchart TD
-    T1["Step 1: Cluster Access<br/>Get email, VPN, SSH working<br/>📍 Admin work - just do it"]
-    T2["Step 2: Containerization<br/>Set up Docker with pinned dependencies<br/>📍 Layer 3 - Frameworks"]
-    T3["Step 3: Single-node training<br/>1 GPU → 4 GPUs with torchrun<br/>📍 Layer 1+2 - Hardware + Kernels"]
-    T4["Step 4: Multi-node training<br/>Fix InfiniBand bottleneck<br/>📍 Layer 5 - Distributed Orchestration"]
-    T5["Step 5: Data pipeline<br/>Batch feeding, HuggingFace cache management<br/>📍 Layer 3 - Frameworks"]
-    T6["Step 6: LLM Serving as API<br/>Run vLLM, expose endpoint<br/>📍 Layer 4+6 - Engines + Serving"]
-    T7["Step 7: Benchmarking<br/>Measure throughput and latency<br/>📍 All layers"]
-    T8["Step 8: Optimization<br/>Mixed precision, gradient compression<br/>📍 Layer 7 - Model Optimization"]
-    T9["Step 9: Kubernetes<br/>Wrap everything in K8s<br/>📍 Layer 5+6 - Orchestration + Serving"]
+    T1["Step 1: Cluster Access<br/>VPN, SSH, confirm which accounts you have<br/>📍 Admin - just do it"]
+    T2["Step 2: Environment Setup<br/>Assess node, set cache dirs, create conda env in share1<br/>📍 Layer 3 - Frameworks"]
+    T3["Step 3: Proof of Life<br/>Verify GPU, run dummy inference on opt-125m<br/>📍 Layer 1+3"]
+    T4["Step 4: Model Sizing<br/>Decide precision - what fits in 44GB?<br/>📍 Layer 7 - Model Optimization"]
+    T5["Step 5: Data Pipeline<br/>HF cache in share1, streaming datasets, no I/O stalls<br/>📍 Layer 3"]
+    T6["Step 6: Single-node Training<br/>1 GPU first, then torchrun 4 GPUs, checkpoint every run<br/>📍 Layer 1+2+3"]
+    T7["Step 7: Benchmarking Baseline<br/>Measure GPU utilization, throughput, latency from day one<br/>📍 All layers"]
+    T8["Step 8: Docker<br/>Containerize the working env - pin everything<br/>📍 Layer 3+6"]
+    T9["Step 9: LLM Serving as API<br/>vLLM on single node, expose endpoint<br/>📍 Layer 4+6"]
+    T10["Step 10: Multi-node Training<br/>Investigate InfiniBand, fix NCCL, cross-node gradients<br/>📍 Layer 5"]
+    T11["Step 11: Optimization<br/>Mixed precision, gradient compression, quantization<br/>📍 Layer 7"]
+    T12["Step 12: Kubernetes<br/>Wrap serving and training in K8s, self-serve infra<br/>📍 Layer 5+6"]
 
     T1 --> T2 --> T3 --> T4
-    T3 --> T5
+    T4 --> T5
     T4 --> T6
     T5 --> T6
     T6 --> T7
     T7 --> T8
     T8 --> T9
+    T8 --> T10
+    T9 --> T11
+    T10 --> T11
+    T11 --> T12
 ```
+
+**What changed from the original and why:**
+
+- Docker moved from step 2 to step 8 - you containerize a *working* environment, not a hypothetical one
+- Quantization/model sizing moved from step 8 to step 4 - you need to know what precision fits in 44GB *before* you try to run training, not after serving is working
+- Benchmarking moved from after serving to step 7 - you need a baseline from the moment something runs, otherwise you can't tell if anything you do later is an improvement
+- Data pipeline is now a prerequisite to training, not a parallel branch - cache must be in place before training starts or you'll hit I/O stalls
+- Multi-node and serving are now independent branches from Docker - fixing InfiniBand doesn't gate serving a model; they can proceed in parallel
 
 ### Your Day One
 
-SSH into one node. Run:
+SSH into one node. Run through the full 0env.md sequence:
+
 ```bash
-nvidia-smi                         # check GPUs are visible
-python -c "import torch; print(torch.cuda.is_available())"  # check PyTorch
+nvidia-smi                                  # what GPU, how much VRAM
+nvcc --version                              # what CUDA - determines your torch build
+df -h                                       # how much space left in share1
+ls /share1/                                 # what teammates already set up
 ```
 
-Then run a toy training script on one GPU. Once that works, containerize it with Docker. That is the foundation everything else builds on.
+Then: set cache dirs, create conda env in share1, install torch pinned to your CUDA version, verify the GPU is visible to PyTorch, run opt-125m inference. That is the test bed. Everything else builds on those seven steps.
 
----
 
 ## Part 8: Key Vocabulary Reference
 
@@ -512,7 +512,6 @@ Then run a toy training script on one GPU. Once that works, containerize it with
 | NAS | Network Attached Storage - a shared disk accessible over the network |
 | Wall-time | Maximum time a job is allowed to run before the scheduler kills it |
 
----
 
 ## Part 9: How Everything Connects - The Full Picture
 
@@ -549,7 +548,6 @@ graph TB
     NAS_hw -->|feeds models to| Docker
 ```
 
----
 
 ## Part 10: Suggested Learning Path
 
