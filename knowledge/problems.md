@@ -6,10 +6,11 @@ ordered immediate to long term. each problem blocks or shapes what comes after i
 
 | Fact | Why it matters |
 |---|---|
-| `home` = 30GB, `share1` = 100GB, `tmp` = 1TB but 7-day delete | Never install envs or cache models in `home` or `tmp` |
-| Turing: LS40/RTX6000 cards, 48GB VRAM each | Max 4 GPUs × 48GB = 192GB per job; 70B FP16 fits |
-| 4-day wall-time limit | Checkpoint early, checkpoint often |
-| Cross-node InfiniBand is currently bottlenecked | Single-node 4-GPU is the reliable ceiling for now |
+| `home` = 50GB persistent | Never install large envs or model caches here |
+| `/scratch` = 14TB/node, 15-day delete | Use for envs and caches; not persistent — back up what matters |
+| Turing: heterogeneous — node01-04 RTX 6000, node05-14 L40S (FP8), node10 8×A100 40GB | Max 4 GPUs × 48GB = 192GB on RTX/L40S nodes; 70B FP16 fits |
+| 4-hour wall-time limit | Checkpoint early, checkpoint often |
+| Cross-node network is 10GbE (not InfiniBand) | Single-node 4-GPU is the reliable ceiling for now |
 | `nlp`/`irel` accounts have 12 GPUs + no time limit | Ask about access - changes what's feasible |
 
 <img src="../media/stage0/IMG_20260419_105731.jpg">
@@ -25,21 +26,22 @@ ordered immediate to long term. each problem blocks or shapes what comes after i
 
 **environment**
 - different PyTorch versions installed across nodes - jobs that work on one node may silently fail on another
-- PyTorch and all libraries installed in home (~30GB limit) - fills up before any model is downloaded
-- no shared conda env or Docker image - every student sets up from scratch, diverging over time
-- HF model cache not pointed at share1 - models re-downloaded repeatedly by each students.
+- PyTorch and all libraries installed in home (~50GB limit) - fills up before any model is downloaded
+- no shared conda env or Singularity image - every student sets up from scratch, diverging over time
+- HF model cache not pointed at /scratch - models re-downloaded repeatedly by each student
 
 ## short term
 
 **compute constraints on Turing**
-- 48GB VRAM per GPU, 192GB across 4 GPUs max - 70B FP16 fits; FP8/mxfp4 not available (needs H/B series)
-- 4-day wall-time limit on all jobs - any training run longer than that gets killed; checkpointing is mandatory
+- RTX 6000 nodes (01-04): 48GB VRAM × 4 = 192GB; 70B FP16 fits; no FP8
+- L40S nodes (05-14): 48GB VRAM × 4 = 192GB; FP8 supported (Ada Lovelace architecture); node10 has 8× A100 40GB
+- 4-hour wall-time limit on all jobs - any training run longer than that gets killed; checkpointing is mandatory
 
 **storage**
-- home: 30GB persistent - cannot hold an env and models simultaneously
-- share1: 100GB persistent - the only viable location, but shared and finite
-- tmp: 1TB but auto-deleted after 7 days - cannot be used for anything that needs to persist
-- no shared model/data cache - each student downloads the same models independently, wasting share1
+- home: 50GB persistent - cannot hold an env and large models simultaneously
+- /scratch: 14TB per node, auto-deleted after 15 days — viable for large data but not persistent
+- no /pfs (parallel filesystem) yet — planned but not available; no shared persistent storage beyond home
+- no shared model/data cache - each student downloads the same models independently, filling /scratch
 
 **single-node utilization**
 - cluster running at <10% GPU utilization - hardware exists but nobody is using it properly
@@ -51,12 +53,12 @@ ordered immediate to long term. each problem blocks or shapes what comes after i
 ## medium term
 
 **cross-node training**
-- InfiniBand between nodes is misconfigured or underperforming - multi-node gradient sync is not feasible yet
-- distributing a model across gnodes fails due to network bottleneck
-- NCCL version and IB support status unknown - needs investigation before any multi-node work
+- cross-node network is 10GbE — not InfiniBand; this is the structural reason multi-node gradient sync is not feasible, not a misconfiguration
+- distributing a model across gnodes fails due to 10GbE bandwidth ceiling (~1 GB/s vs ~600 GB/s NVLink intra-node)
+- NCCL tuning for 10GbE Ethernet (not IB) is the relevant investigation
 
 **dependency and portability**
-- no Docker images in place - moving a working job to cloud requires manual env reconstruction
+- no Singularity images in place — Turing runs Singularity (singularity-ce/4.2.2), not Docker directly; Docker images pushed to GHCR can be pulled via Singularity on the cluster
 - no pinned, reproducible environment - experiments are not reliably reproducible across nodes or students
 - no dev-mode vs burst-mode distinction in current workflow — dev (interactive Turing sessions) and burst (scheduled K8s jobs, cloud-portable) require different image designs
 
@@ -75,7 +77,7 @@ ordered immediate to long term. each problem blocks or shapes what comes after i
 - no NAS in place - proposed solution to shared model/data cache problem; not yet purchased or set up
   > **NOTE:** In the pilot proposal, NAS is a Phase A deliverable and a hard prerequisite for the shared model cache. This is currently blocked pending hardware purchase. Track its status actively with the supervisor — once available, all cache paths (`HF_HOME`, pip, conda) must move to the NAS mount.
 - Kubernetes layer discussed but not in place - infra is not self-serve for other students/projects
-  > **NOTE:** In the pilot proposal, Kubernetes is funded and scoped to Phase A — running in parallel with storage and container work, not sequenced after serving. The intern does not implement K8s, but all Docker work must be K8s-compatible from the start: no hardcoded paths, env variable injection for all configurable values, health check endpoints on all serving processes.
+  > **NOTE:** In the pilot proposal, Kubernetes is funded and scoped to Phase A — running in parallel with storage and container work, not sequenced after serving. The intern does not implement K8s, but all Singularity/Docker work must be K8s-compatible from the start: no hardcoded paths, env variable injection for all configurable values, health check endpoints on all serving processes.
 - no autoscaling or GPU-aware job scheduling beyond what the existing scheduler provides
 - B/H-series GPU capabilities (mxfp4, mxfp8, larger VRAM) completely unavailable on current hardware - limits what optimizations are even possible
 

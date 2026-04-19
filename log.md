@@ -19,3 +19,11 @@
 
 - cleared all referencs of Ada cluster
 - got an idea of what the first work will be: env setup + scripts + dockerfiles
+- decide the tooling and inform supervisor [conda, ]
+- omw to read:
+    + [How GPU Computing Works?](https://www.youtube.com/live/3l10o0DYJXg) by Stephen Jones
+    + [Internals of CPU and GPU](https://tamal.tech/cpu-gpu-internals/)
+    + [NVIDIA RTX 6000 spec sheet](https://www.nvidia.com/content/dam/en-zz/Solutions/design-visualization/rtx-6000/proviz-print-rtx6000-datasheet-web-2504660.pdf)
+    + [Roofline: An Insightful Visual Performance Model for Floating-Point Programs and Multicore Architectures](https://people.eecs.berkeley.edu/~kubitron/cs252/handouts/papers/RooflineVyNoYellow.pdf)
+    + [Making Deep Learning Go Brrrr From First Principles](https://horace.io/brrr_intro.html) by Horace He
+    + Simon Boehm's [blog](https://siboehm.com/)

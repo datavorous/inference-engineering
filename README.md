@@ -9,7 +9,7 @@ The field is new, and doesn't have structured and well organized information on 
 All my actions are [logged](log.md). Problems which I was told to tackle are in [here](knowledge/problems.md), and will be updated accordingly.
 
 Right now, my work is on:  
-1. infra/ops: env setup, storage, docker, InfiniBand, nas, kubernetes
+1. infra/ops: env setup, storage, singularity/docker, 10GbE cross-node, nas, kubernetes
 2. serving: vLLM deployment, API exposure
 
 In future (incomplete list):
@@ -19,7 +19,7 @@ In future (incomplete list):
 The model quality side (kernels, quantization, distillation) comes later once the infra is stable enough to actually experiment on.
 
 > [!NOTE]
-> It was decided that all work will be done on the **Turing cluster** exclusively. Turing is a homogeneous cluster i.e. every node is equipped with **LS40 / RTX 6000** GPU cards (48GB VRAM each).
+> It was decided that all work will be done on the **Turing cluster** exclusively. Turing is a heterogeneous cluster: **node01-04** have RTX 6000 (48GB VRAM), **node05-14** have L40S (48GB VRAM, Ada Lovelace, FP8 supported), **node10** has 8× A100 40GB.
 > I have used Claude Code and Opus 4.7 to aid the documentation process.
 
 ## micro-log
@@ -37,7 +37,7 @@ The model quality side (kernels, quantization, distillation) comes later once th
         + additionally have some verification scripts.
     - create a setup repo
     - dockerize it eventually, push docker images. 
-    - expected result: dependecy errors are avoided, libraries with pinned version(s) are used with minimal setup headache, users start using the `/share1` directory, HF models get cached. 
+    - expected result: dependecy errors are avoided, libraries with pinned version(s) are used with minimal setup headache, users start using `/scratch`, HF models get cached. 
         + > FINAL: anyone can can clone, run the setup script, pull the image, and run inference. 
     
 

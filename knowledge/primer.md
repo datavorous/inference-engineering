@@ -33,13 +33,15 @@ The team's clusters have NVIDIA GPUs. Each GPU has its own **VRAM** (Video RAM) 
 
 ## Part 3: The Turing Cluster
 
-The team works on the **Turing cluster** — a homogeneous collection of computers ("nodes") connected by a fast network, each node equipped with the same GPU hardware.
+The team works on the **Turing cluster** — a heterogeneous collection of computers ("nodes") connected by a 10GbE network, with different GPU hardware across node groups.
 
 ```mermaid
 graph TB
     subgraph Turing["Turing Cluster (pay-per-use)"]
         direction TB
-        T1[LS40 / RTX6000 GPUs<br/>48GB VRAM each<br/>up to 4 GPUs per job = 192GB ceiling]
+        T1["node01-04: RTX 6000<br/>48GB VRAM × 4 = 192GB"]
+        T2["node05-14: L40S (Ada, FP8)<br/>48GB VRAM × 4 = 192GB"]
+        T3["node10: 8× A100 40GB<br/>320GB total"]
     end
 
     Turing -->|all work runs here| U[Your Research Work]
@@ -117,7 +119,9 @@ graph BT
 No software trick can exceed these physical limits.
 
 **Relevant to our cluster:**
-- LS40 / RTX 6000 (Turing): 48GB VRAM, modern CUDA, capable of large model workloads
+- RTX 6000 (node01-04): 48GB VRAM, CUDA, capable of large model workloads; no FP8
+- L40S (node05-14): 48GB VRAM, Ada Lovelace architecture, FP8 supported
+- A100 40GB (node10): 8× GPUs, 320GB total VRAM; strong for large model training
 
 **Impact on you:** When a model run crashes with "CUDA out of memory", this layer is why. The fix is either a smaller model, lower precision, or spreading across more GPUs.
 
@@ -280,7 +284,7 @@ graph TB
 
 **Why "cross-node" communication is the hard part:**
 
-Within a single node (4 GPUs), NVIDIA's NVLink connects them at ~600 GB/s. Between nodes, you rely on InfiniBand or Ethernet, which is ~10-200 GB/s.
+Within a single node (4 GPUs), NVIDIA's NVLink connects them at ~600 GB/s. Between nodes, Turing uses 10GbE Ethernet at ~1 GB/s — roughly 600× slower than intra-node NVLink.
 
 ```mermaid
 flowchart LR
@@ -292,7 +296,7 @@ flowchart LR
     subgraph Node2["Node 2 (gnode02)"]
         G5[GPU 0] <-->|NVLink| G6[GPU 1]
     end
-    Node1 <-->|InfiniBand ~100GB/s<br/>10x slower than NVLink| Node2
+    Node1 <-->|10GbE ~1GB/s<br/>600x slower than NVLink| Node2
 ```
 
 This bandwidth gap is why single-node 4-GPU is the easiest starting point before investing in cross-node training.
@@ -357,13 +361,13 @@ This section maps the infrastructure issues from the meeting notes to the techni
 mindmap
   root((LTRC Cluster Problems))
     Storage
-      Home dir only 30GB persistent
-      Share1 only 100GB persistent
-      1TB tmp has 7-day auto-delete
+      Home dir 50GB persistent
+      /scratch 14TB per node, 15-day auto-delete
+      No /pfs yet, coming later
       No shared model cache → repeated downloads
     Compute
-      Cross-node network bottleneck InfiniBand underperforming
-      4-day wall-time job limit
+      Cross-node network is 10GbE not InfiniBand
+      4-hour wall-time job limit
       Less than 10 percent GPU utilization
     Dependencies
       Different PyTorch versions across nodes
@@ -379,25 +383,22 @@ mindmap
 ```mermaid
 graph TB
     subgraph Storage["Storage available per user"]
-        Home["home directory<br/>30GB - persistent<br/>⚠️ PyTorch alone fills this"]
-        Share1["share1<br/>100GB - persistent<br/>⚠️ Only place for model cache"]
-        Tmp["tmp (NAS)<br/>1TB - AUTO-DELETED after 7 days<br/>⚠️ Slow network access"]
+        Home["home directory<br/>50GB - persistent<br/>⚠️ PyTorch alone fills this"]
+        Scratch["/scratch<br/>14TB/node - AUTO-DELETED after 15 days<br/>⚠️ Not persistent — back up checkpoints"]
     end
-
-    Home -->|scp over network = slow| Tmp
-    Share1 -->|scp over network = slow| Tmp
 ```
 
 **The recommendation** from the team: Buy a NAS (Network Attached Storage) device, replicate it to Turing, and use it as a shared model/data cache. This would eliminate the repeated downloading of the same models by every student.
 
 ### The Compute Problem in Detail
 
-| Scenario | Turing RTX6000 (4 GPUs, 192GB total) |
-|---|---|
-| 8B param model FP16 training | ~1 day |
-| 70B param model FP16 | Just barely fits |
-| Flash-attention optimization | Supported |
-| FP8 / mxfp4 | Not supported (needs H/B series) |
+| Scenario | RTX 6000 nodes (01-04) | L40S nodes (05-14) | A100 node (node10) |
+|---|---|---|---|
+| 8B param model FP16 training | ~1 day | ~1 day | faster |
+| 70B param model FP16 | Just barely fits (192GB) | Just barely fits (192GB) | Fits with room (320GB) |
+| FlashAttention | Supported | Supported | Supported |
+| FP8 | Not supported | Supported (Ada arch) | Supported |
+| mxfp4 | Not available | Not available | Not available |
 
 
 ## Part 7: The Work Plan - What You Will Actually Do
@@ -405,15 +406,15 @@ graph TB
 ```mermaid
 flowchart TD
     T1["Step 1: Cluster Access<br/>VPN, SSH, confirm which accounts you have<br/>📍 Admin - just do it"]
-    T2["Step 2: Environment Setup<br/>Assess node, set cache dirs, create conda env in share1<br/>📍 Layer 3 - Frameworks"]
+    T2["Step 2: Environment Setup<br/>Assess node, load CUDA module, set cache dirs, create conda env in /scratch<br/>📍 Layer 3 - Frameworks"]
     T3["Step 3: Proof of Life<br/>Verify GPU, run dummy inference on opt-125m<br/>📍 Layer 1+3"]
     T4["Step 4: Model Sizing<br/>Decide precision - what fits in 192GB?<br/>📍 Layer 7 - Model Optimization"]
-    T5["Step 5: Data Pipeline<br/>HF cache in share1, streaming datasets, no I/O stalls<br/>📍 Layer 3"]
+    T5["Step 5: Data Pipeline<br/>HF cache in /scratch, streaming datasets, no I/O stalls<br/>📍 Layer 3"]
     T6["Step 6: Single-node Training<br/>1 GPU first, then torchrun 4 GPUs, checkpoint every run<br/>📍 Layer 1+2+3"]
     T7["Step 7: Benchmarking Baseline<br/>Measure GPU utilization, throughput, latency from day one<br/>📍 All layers"]
     T8["Step 8: Docker<br/>Containerize the working env - pin everything<br/>📍 Layer 3+6"]
     T9["Step 9: LLM Serving as API<br/>vLLM on single node, expose endpoint<br/>📍 Layer 4+6"]
-    T10["Step 10: Multi-nodeV Training<br/>Investigate InfiniBand, fix NCCL, cross-node gradients<br/>📍 Layer 5"]
+    T10["Step 10: Multi-node Training<br/>Investigate 10GbE constraints, tune NCCL for Ethernet, cross-node gradients<br/>📍 Layer 5"]
     T11["Step 11: Optimization<br/>Mixed precision, gradient compression, quantization<br/>📍 Layer 7"]
     T12["Step 12: Kubernetes<br/>Wrap serving and training in K8s, self-serve infra<br/>📍 Layer 5+6"]
 
@@ -444,12 +445,13 @@ SSH into one node. Run through the full 0env.md sequence:
 
 ```bash
 nvidia-smi                                  # what GPU, how much VRAM
-nvcc --version                              # what CUDA - determines your torch build
-df -h                                       # how much space left in share1
-ls /share1/                                 # what teammates already set up
+module avail                                # see available CUDA modules
+module load u22/cuda/12.4                   # load CUDA (12.4 or 12.9 recommended)
+df -h /scratch                              # how much space left in /scratch
+ls /scratch/                                # what teammates already set up
 ```
 
-Then: set cache dirs, create conda env in share1, install torch pinned to your CUDA version, verify the GPU is visible to PyTorch, run opt-125m inference. That is the test bed. Everything else builds on those seven steps.
+Then: load the CUDA module (`module load u22/cuda/12.4`), set cache dirs, create conda env in /scratch/$USER, install torch pinned to that CUDA version, verify the GPU is visible to PyTorch, run opt-125m inference. That is the test bed. Everything else builds on those steps.
 
 
 ## Part 8: Key Vocabulary Reference
@@ -493,7 +495,7 @@ Then: set cache dirs, create conda env in share1, install torch pinned to your C
 |---|---|
 | Node / gnode | One physical machine (with its GPUs) in a cluster |
 | NVLink | NVIDIA's fast cable connecting GPUs within a node (~600 GB/s) |
-| InfiniBand | Fast network between nodes (~100 GB/s - much slower than NVLink) |
+| InfiniBand | High-speed inter-node network protocol — Turing uses 10GbE instead (~1 GB/s) |
 | SLURM | Job scheduler software used on HPC clusters to queue and run jobs |
 | Docker | Containerization tool - packages your code + dependencies into a portable image |
 | Kubernetes (K8s) | Orchestrates many Docker containers across many machines |
@@ -506,13 +508,13 @@ Then: set cache dirs, create conda env in share1, install torch pinned to your C
 ```mermaid
 graph TB
     subgraph Physical["Physical Layer"]
-        GPU2["Turing GPUs<br/>48GB VRAM each<br/>LS40/RTX6000<br/>homogeneous cluster"]
-        IB["InfiniBand<br/>inter-node network<br/>⚠️ currently bottlenecked"]
+        GPU2["Turing GPUs<br/>RTX 6000 / L40S / A100<br/>heterogeneous cluster"]
+        IB["10GbE<br/>inter-node network<br/>⚠️ ~1GB/s ceiling limits cross-node training"]
         NAS_hw["Proposed NAS<br/>shared model/data cache"]
     end
 
     subgraph Software["Software Layer"]
-        Docker["Docker containers<br/>pinned dependencies<br/>portable across nodes"]
+        Singularity["Singularity containers<br/>pulled from GHCR (Docker images)<br/>run on Turing nodes"]
         PyTorch["PyTorch<br/>model definition<br/>training loops"]
         NCCL["NCCL<br/>gradient sync across GPUs"]
         vLLM["vLLM<br/>efficient inference engine<br/>continuous batching + PagedAttention"]
@@ -525,14 +527,14 @@ graph TB
 
     Physical --> Software --> Serving
 
-    GPU2 -->|run| Docker
-    Docker -->|contains| PyTorch
+    GPU2 -->|run| Singularity
+    Singularity -->|contains| PyTorch
     PyTorch -->|uses| NCCL
     NCCL -->|syncs across| IB
-    Docker -->|contains| vLLM
+    Singularity -->|contains| vLLM
     vLLM -->|exposes| API
     API -->|managed by| K8s
-    NAS_hw -->|feeds models to| Docker
+    NAS_hw -->|feeds models to| Singularity
 ```
 
 
